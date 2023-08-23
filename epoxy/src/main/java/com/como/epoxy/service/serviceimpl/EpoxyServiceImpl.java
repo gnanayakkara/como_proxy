@@ -13,8 +13,10 @@ import org.springframework.web.client.RestTemplate;
 import java.lang.reflect.Type;
 import java.util.Base64;
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class EpoxyServiceImpl implements EpoxyService {
@@ -137,14 +139,20 @@ public class EpoxyServiceImpl implements EpoxyService {
 
             Gson gson = new Gson();
 
-            List<String> list = resourceServiceDTOList.stream().map(dto -> dto.getUrl() + ":" + dto.getResponseValue()).toList();
+            StringJoiner combinedJoiner = new StringJoiner(",","{","}");
 
             if (epoxyRequestDTO.getResultType().equals("combined")){
 
-                return gson.toJson(list.toArray());
+                for(ResourceServiceDTO dto : resourceServiceDTOList){
+                    combinedJoiner.add(dto.getUrl() + ":" + dto.getResponseValue());
+                }
+                return gson.toJson(combinedJoiner.toString());
 
             } else if (epoxyRequestDTO.getResultType().equals("appended")){
 
+                List<String> list = resourceServiceDTOList.stream()
+                        .map(dto -> String.valueOf(new StringJoiner(",","{","}")
+                                .add(dto.getUrl()+":"+dto.getResponseValue()))).toList();
                 return gson.toJson(list);
             }
         }
