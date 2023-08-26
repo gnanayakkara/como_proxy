@@ -10,11 +10,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Array;
 import java.lang.reflect.Type;
-import java.util.Base64;
-import java.util.List;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -45,15 +46,16 @@ public class EpoxyServiceImpl implements EpoxyService {
                 })
                 .collect(Collectors.toList());
 
-        List<ResourceServiceDTO> resourceServiceDTOList = collect.stream().map(val -> {
+        Map<String, String> collectedResources = collect.stream().map(val -> {
             try {
                 return val.get();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-        }).collect(Collectors.toList());
+        }).collect(Collectors.toMap(ResourceServiceDTO::getUrl, ResourceServiceDTO::getResponseValue));
 
-        return buildResponse(resourceServiceDTOList,epoxyRequestDTO);
+        return buildResponse(collectedResources,epoxyRequestDTO);
+
     }
 
     /**
@@ -133,27 +135,26 @@ public class EpoxyServiceImpl implements EpoxyService {
         }).start();
     }
 
-    private String buildResponse(List<ResourceServiceDTO> resourceServiceDTOList,EpoxyRequestDTO epoxyRequestDTO) {
+    private String buildResponse(Map<String,String> resourceServiceDTOMap,EpoxyRequestDTO epoxyRequestDTO) throws Exception {
 
-        if(resourceServiceDTOList != null) {
+        if(resourceServiceDTOMap != null) {
 
             Gson gson = new Gson();
 
-            StringJoiner combinedJoiner = new StringJoiner(",","{","}");
-
             if (epoxyRequestDTO.getResultType().equals("combined")){
 
-                for(ResourceServiceDTO dto : resourceServiceDTOList){
-                    combinedJoiner.add(dto.getUrl() + ":" + dto.getResponseValue());
-                }
-                return gson.toJson(combinedJoiner.toString());
+                Type typeObject = new TypeToken<HashMap>() {}.getType();
+                return gson.toJson(resourceServiceDTOMap, typeObject);
 
             } else if (epoxyRequestDTO.getResultType().equals("appended")){
 
-                List<String> list = resourceServiceDTOList.stream()
-                        .map(dto -> String.valueOf(new StringJoiner(",","{","}")
-                                .add(dto.getUrl()+":"+dto.getResponseValue()))).toList();
-                return gson.toJson(list);
+                String[][] buildArray = resourceServiceDTOMap.entrySet().stream()
+                        .map(entry -> new String[]{entry.getKey(), entry.getValue()})
+                        .toArray(String[][]::new);
+
+                Type typeObject = new TypeToken<String[][]>() {}.getType();
+
+                return gson.toJson(buildArray,typeObject);
             }
         }
 
