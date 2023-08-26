@@ -10,14 +10,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Array;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 public class EpoxyServiceImpl implements EpoxyService {
@@ -34,15 +30,19 @@ public class EpoxyServiceImpl implements EpoxyService {
         //Create threads for the urls
         ExecutorService executorService = Executors.newFixedThreadPool(listOfUrls.size());
 
-        //Terminate the process if timeout params available
-        if (epoxyRequestDTO.getRequestParams().get("timeout") != null){
-            terminateThreadGroup(epoxyRequestDTO,executorService);
-        }
-
         //Submit invoke api task to thread pool
         List<CompletableFuture<ResourceServiceDTO>> collect = listOfUrls.stream()
                 .map(site -> {
-                    return CompletableFuture.supplyAsync(() -> this.callResourseServices(site,epoxyRequestDTO), executorService);
+                    CompletableFuture<ResourceServiceDTO> resourceServiceDTOCompletableFuture = CompletableFuture
+                            .supplyAsync(() -> this.callResourseServices(site, epoxyRequestDTO), executorService);
+
+                    //Terminate the process if timeout params available
+                    if(epoxyRequestDTO.getRequestParams().get("timeout")!=null){
+                        terminateThread(resourceServiceDTOCompletableFuture,epoxyRequestDTO);
+                    }
+
+                    return resourceServiceDTOCompletableFuture;
+
                 })
                 .collect(Collectors.toList());
 
@@ -113,26 +113,14 @@ public class EpoxyServiceImpl implements EpoxyService {
         return null;
     }
 
+
     /**
-     * Configure time out
-     * @param executorService
-     * @throws Exception
+     * Set timeout value to completable feature
+     * @param resourceServiceDTOCompletableFuture
+     * @param epoxyRequestDTO
      */
-    private void terminateThreadGroup(EpoxyRequestDTO epoxyRequestDTO,ExecutorService executorService){
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try{
-                    if(!executorService.awaitTermination(Long.valueOf(epoxyRequestDTO.getRequestParams().get("timeout")),TimeUnit.MILLISECONDS)){
-                        executorService.shutdown();
-                        //Set time out value for thread group
-                        executorService.shutdownNow();
-                    }
-                 } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }).start();
+    private void terminateThread(CompletableFuture<ResourceServiceDTO> resourceServiceDTOCompletableFuture,EpoxyRequestDTO epoxyRequestDTO){
+        resourceServiceDTOCompletableFuture.orTimeout(Long.valueOf(epoxyRequestDTO.getRequestParams().get("timeout")),TimeUnit.MILLISECONDS);
     }
 
     private String buildResponse(Map<String,String> resourceServiceDTOMap,EpoxyRequestDTO epoxyRequestDTO) throws Exception {
