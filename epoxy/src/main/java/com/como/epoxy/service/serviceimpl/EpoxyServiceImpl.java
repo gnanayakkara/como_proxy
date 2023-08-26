@@ -1,5 +1,6 @@
 package com.como.epoxy.service.serviceimpl;
 
+import com.como.epoxy.Exception.RequestFailedException;
 import com.como.epoxy.dto.EpoxyRequestDTO;
 import com.como.epoxy.dto.RequestURLs;
 import com.como.epoxy.dto.ResourceServiceDTO;
@@ -81,7 +82,7 @@ public class EpoxyServiceImpl implements EpoxyService {
      * @param url
      * @return
      */
-    private ResourceServiceDTO callResourseServices(String url,EpoxyRequestDTO requestDTO){
+    private ResourceServiceDTO callResourseServices(String url,EpoxyRequestDTO requestDTO) {
 
         try {
             RestTemplate restTemplate = new RestTemplate();
@@ -98,7 +99,7 @@ public class EpoxyServiceImpl implements EpoxyService {
             //Error handle for requested parameter
             if (requestDTO.getRequestParams().get("errors") != null) {
                 if (requestDTO.getRequestParams().get("errors").equals("[fail_any]")){
-                    throw new RuntimeException("Execution failed for URL : " + url);
+                    throw new RequestFailedException(url);
                 } else if(requestDTO.getRequestParams().get("errors").equals("[replace]")){
                     ResourceServiceDTO resourceServiceDTO = new ResourceServiceDTO();
                     resourceServiceDTO.setUrl(url);
